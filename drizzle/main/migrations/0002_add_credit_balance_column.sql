@@ -1,0 +1,1 @@
+ALTER TABLE "bs_customer" ADD COLUMN "credit_balance" numeric(10, 2) DEFAULT '10.00' NOT NULL;
