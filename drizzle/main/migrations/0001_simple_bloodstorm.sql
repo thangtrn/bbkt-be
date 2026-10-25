@@ -1,0 +1,1 @@
+ALTER TABLE "record_schema" ADD COLUMN "code" varchar NOT NULL;

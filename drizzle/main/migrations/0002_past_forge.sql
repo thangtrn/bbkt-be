@@ -1,0 +1,1 @@
+ALTER TABLE "record_schema" ALTER COLUMN "code" SET DATA TYPE varchar(50);

@@ -17,5 +17,7 @@ export class RecordSchemaResponseDto extends BaseResponseDto {
     type: 'object',
     additionalProperties: true,
   })
-  readonly fieldsDefinition!: Record<string, unknown>;
+  readonly fieldsDefinition!:
+    | Record<string, unknown>
+    | Record<string, unknown>[];
 }
