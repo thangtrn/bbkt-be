@@ -1,17 +1,13 @@
 import { InferInsertModel, InferSelectModel } from 'drizzle-orm';
-import {
-  bigint,
-  jsonb,
-  pgTable,
-  timestamp,
-  varchar,
-} from 'drizzle-orm/pg-core';
+import { jsonb, pgTable, timestamp, uuid, varchar } from 'drizzle-orm/pg-core';
 
 export const recordSchemaModel = pgTable('record_schema', {
-  id: bigint({ mode: 'number' }).primaryKey().generatedAlwaysAsIdentity(),
+  id: uuid('id').defaultRandom().primaryKey(),
 
   name: varchar('name').notNull(),
-  fieldsDefinition: jsonb('fields_definition').notNull(),
+  fieldsDefinition: jsonb('fields_definition')
+    .$type<Record<string, unknown>>()
+    .notNull(),
 
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at')

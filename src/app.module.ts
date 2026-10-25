@@ -6,7 +6,7 @@ import { HttpExceptionFilter } from '@/core/exceptions/http.exception';
 import { ContextInterceptor } from '@/core/interceptors/context.interceptor';
 import { LoggerInterceptor } from '@/core/interceptors/logger.interceptor';
 import { DrizzleClientModule } from '@/libs/drizzle-client/drizzle-client.module';
-import { GenreModule } from './modules/genre/genre.module';
+import { RecordSchemaModule } from './modules/record-schema/record-schema.module';
 
 const interceptors = [
   {
@@ -30,7 +30,7 @@ const interceptors = [
       databaseUrl: databaseConfig.databaseUrl,
     }),
 
-    GenreModule,
+    RecordSchemaModule,
   ],
   providers: [...interceptors],
 })

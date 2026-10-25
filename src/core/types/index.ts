@@ -9,3 +9,4 @@ export * from './object-literal.type';
 export * from './require-one.type';
 export * from './mutable.type';
 export * from './field-modifier.type';
+export * from './drizzle.type';

@@ -3,19 +3,19 @@ import { ApiProperty } from '@nestjs/swagger';
 export class BaseResponseDto {
   @ApiProperty({
     description: 'Unique identifier for the entity',
-    example: '550e8400-e29b-41d4-a716-446655440000',
+    example: '12312312312312312312312',
   })
-  readonly id: string;
+  readonly id!: string;
 
   @ApiProperty({
     description: 'Date and time when this genre was created',
     example: '2024-04-01T10:20:30Z',
   })
-  createdAt: Date | string;
+  createdAt!: Date | string;
 
   @ApiProperty({
     description: 'Date and time when this genre was last updated',
     example: '2024-04-10T14:30:00Z',
   })
-  updatedAt: Date | string;
+  updatedAt!: Date | string;
 }

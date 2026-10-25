@@ -1,16 +1,16 @@
 import { InferInsertModel, InferSelectModel } from 'drizzle-orm';
-import { bigint, jsonb, pgTable, timestamp } from 'drizzle-orm/pg-core';
+import { bigint, jsonb, pgTable, timestamp, uuid } from 'drizzle-orm/pg-core';
 import { recordSchemaModel } from './record-schema.model';
 
 export const recordDataModel = pgTable('record_data', {
-  id: bigint({ mode: 'number' }).primaryKey().generatedAlwaysAsIdentity(),
+  id: uuid('id').defaultRandom().primaryKey(),
 
   // Khóa ngoại trỏ đến Model 1 để biết data này thuộc cấu trúc nào
-  schemaId: bigint({ mode: 'number' })
+  schemaId: uuid('schema_id')
     .notNull()
     .references(() => recordSchemaModel.id, { onDelete: 'cascade' }),
 
-  dataValues: jsonb('data_values').notNull(), // Lưu object dữ liệu thực tế (json số 2 của bạn)
+  dataValues: jsonb('data_values').$type<Record<string, unknown>>().notNull(), // Lưu object dữ liệu thực tế (json số 2 của bạn)
 
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at')
