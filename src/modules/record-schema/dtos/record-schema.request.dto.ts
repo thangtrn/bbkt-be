@@ -116,10 +116,7 @@ export class CreateRecordSchemaRequestDto {
   @ValidateIf((_, value) => Array.isArray(value))
   @IsArray()
   @IsNotEmpty()
-  @ValidateIf((_, value) => !Array.isArray(value))
-  @IsObject()
-  @IsNotEmpty()
-  fieldsDefinition!: Record<string, unknown> | Record<string, unknown>[];
+  fieldsDefinition!: Record<string, unknown>[];
 }
 
 export class UpdateRecordSchemaRequestDto extends PartialType(

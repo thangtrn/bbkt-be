@@ -11,9 +11,7 @@ export const recordDataModel = pgTable('record_data', {
     .notNull()
     .references(() => recordSchemaModel.id, { onDelete: 'cascade' }),
 
-  dataValues: jsonb('data_values')
-    .$type<Record<string, unknown> | Record<string, unknown>[]>()
-    .notNull(), // Lưu object dữ liệu thực tế (json số 2 của bạn)
+  dataValues: jsonb('data_values').$type<Record<string, unknown>[]>().notNull(), // Lưu object dữ liệu thực tế (json số 2 của bạn)
 
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at')
