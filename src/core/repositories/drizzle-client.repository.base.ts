@@ -23,9 +23,12 @@ export abstract class DrizzleClientRepository<TDbModel extends ObjectLiteral>
   }
 
   async insert(entity: TDbModel): Promise<TDbModel> {
-    const result = await this._client.insert(this.model).values(entity);
+    const result = await this._client
+      .insert(this.model)
+      .values(entity)
+      .returning();
 
-    return result[0];
+    return result[0] as TDbModel;
   }
 
   async update(id: string, props: ObjectLiteral): Promise<TDbModel | null> {
