@@ -1,10 +1,19 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InsertRecordSchemaModel, RecordSchemaModel } from '@drizzle/main';
+import { QueryParams } from '@/core/repositories/drizzle-client.repository.port';
 import { RecordSchemaRepository } from './record-schema.repository';
 
 @Injectable()
 export class RecordSchemaService {
   constructor(private readonly recordSchemaRepo: RecordSchemaRepository) {}
+
+  async findRecordSchema(id: string): Promise<RecordSchemaModel> {
+    return await this.recordSchemaRepo.findOneById(id);
+  }
+
+  async findAllRecordSchema(query: QueryParams): Promise<RecordSchemaModel[]> {
+    return await this.recordSchemaRepo.findAll(query);
+  }
 
   async createRecordSchema(
     entity: InsertRecordSchemaModel,

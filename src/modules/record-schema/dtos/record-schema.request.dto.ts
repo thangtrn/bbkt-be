@@ -1,12 +1,15 @@
 import { ApiProperty, PartialType } from '@nestjs/swagger';
+import { RecordSchemaModel } from '@drizzle/main';
 import {
   IsArray,
   IsNotEmpty,
-  IsObject,
   IsString,
   MaxLength,
   ValidateIf,
 } from 'class-validator';
+import { FilterDto } from '@/core/dtos';
+
+export class FindRecordSchemaRequestDto extends FilterDto<RecordSchemaModel> {}
 
 export class CreateRecordSchemaRequestDto {
   @ApiProperty({
