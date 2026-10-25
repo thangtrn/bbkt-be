@@ -11,7 +11,11 @@ export class DocxtemplaterService {
     private readonly options: DocxtemplaterOptions,
   ) {}
 
-  async renderTemplate(content: string): Promise<null> {
+  async renderTemplate(
+    templateFolderPath: string,
+    excelFolderPath: string,
+    content: string,
+  ): Promise<null> {
     const doc = new Docxtemplater();
     return null;
   }
