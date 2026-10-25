@@ -485,11 +485,11 @@ export class FilterParser<TTable extends IFilterTable> {
     const dataType = column.columnType;
 
     for (const [logicType, keywords] of Object.entries(this.groups)) {
-      console.log(
-        dataType,
-        logicType,
-        keywords.some((keyword) => dataType.toLowerCase().includes(keyword)),
-      );
+      // console.log(
+      //   dataType,
+      //   logicType,
+      //   keywords.some((keyword) => dataType.toLowerCase().includes(keyword)),
+      // );
       if (
         keywords.some((keyword) => dataType.toLowerCase().includes(keyword))
       ) {
