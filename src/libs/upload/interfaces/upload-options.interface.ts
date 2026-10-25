@@ -1,1 +1,3 @@
-export interface UploadOptions {}
+export interface UploadOptions {
+  uploadFolder: string;
+}

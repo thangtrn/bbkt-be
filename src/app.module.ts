@@ -7,6 +7,7 @@ import { ContextInterceptor } from '@/core/interceptors/context.interceptor';
 import { LoggerInterceptor } from '@/core/interceptors/logger.interceptor';
 import { DrizzleClientModule } from '@/libs/drizzle-client/drizzle-client.module';
 import { AppController } from './app.controller';
+import { uploadConfig } from './configs/upload.config';
 import { DocxtemplaterModule } from './libs/docxtemplater/docxtemplater.module';
 import { UploadModule } from './libs/upload/upload.module';
 import { RecordSchemaModule } from './modules/record-schema/record-schema.module';
@@ -33,7 +34,7 @@ const interceptors = [
       databaseUrl: databaseConfig.databaseUrl,
     }),
     DocxtemplaterModule.forRoot({}),
-    UploadModule.forRoot({}),
+    UploadModule.forRoot(uploadConfig),
 
     RecordSchemaModule,
   ],
