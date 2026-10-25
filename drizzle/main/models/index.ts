@@ -1,1 +1,2 @@
-export * from './genre.model';
+export * from './record-schema.model';
+export * from './record-data.model';
