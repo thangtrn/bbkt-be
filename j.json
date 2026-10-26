@@ -1,0 +1,28 @@
+{
+  "result": [
+    {
+      "tt": 1,
+      "hoTen": "Lê Hữu Cường",
+      "namSinh": 1985,
+      "CmndCccdHoChieu": "038085038223",
+      "NgayCap": "23/11/2023",
+      "noiLamViec": "Công ty TNHH Kỹ Thuật Tạo Khuôn LONGFA Việt Nam",
+      "DiemLyThuyet": 6,
+      "DiemThucHanh": 7,
+      "Dat": true,
+      "KhongDat": false
+    },
+    {
+      "tt": 2,
+      "hoTen": "Phạm Hồng Phước",
+      "namSinh": 1996,
+      "CmndCccdHoChieu": "040096004416",
+      "NgayCap": "11/01/2023",
+      "noiLamViec": "Công ty TNHH Kỹ Thuật Tạo Khuôn LONGFA Việt Nam",
+      "DiemLyThuyet": 7,
+      "DiemThucHanh": 8,
+      "Dat": true,
+      "KhongDat": false
+    }
+  ]
+}

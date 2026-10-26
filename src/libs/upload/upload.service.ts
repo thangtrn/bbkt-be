@@ -3,13 +3,23 @@ import {
   Inject,
   Injectable,
   InternalServerErrorException,
-  StreamableFile,
 } from '@nestjs/common';
-import { createReadStream } from 'node:fs';
 import { mkdir, readdir, readFile, stat, writeFile } from 'node:fs/promises';
-import { basename, dirname, join, relative, resolve, sep } from 'node:path';
+import { basename, join, resolve } from 'node:path';
 import { UploadOptions } from './interfaces';
 import { UPLOAD_MODULE_OPTIONS } from './upload.module-definition';
+
+export interface UploadFileResult {
+  name: string;
+  path: string;
+  size: number;
+}
+
+export interface StoredFile {
+  name: string;
+  buffer: Buffer;
+  size: number;
+}
 
 @Injectable()
 export class UploadService {
@@ -18,205 +28,106 @@ export class UploadService {
     private readonly options: UploadOptions,
   ) {}
 
+  private utf8FileName(path: string): string {
+    return Buffer.from(basename(path), 'latin1').toString('utf8');
+  }
+
   /**
-   * Upload file lên hệ thống, tự động sửa lỗi phông chữ tiếng Việt bằng latin1 -> utf8
-   * và chuẩn hóa Unicode về dạng NFC để tương thích tốt với Windows.
+   * Lưu nhiều file vào folder.
+   * files là danh sách file từ Multer.
    */
   async uploadFiles(
-    path: string,
     files: Express.Multer.File[],
-  ): Promise<string[]> {
-    const uploadDir = join(process.cwd(), this.options.uploadFolder, path);
+    folderPath?: string,
+  ): Promise<UploadFileResult[]> {
+    if (!files?.length) {
+      throw new BadRequestException('Không có file để upload');
+    }
+
+    const targetFolder = this.resolveFolder(folderPath);
 
     try {
-      // Tạo folder nếu chưa tồn tại
-      await mkdir(uploadDir, { recursive: true });
+      await mkdir(targetFolder, { recursive: true });
 
-      const uploadedFiles: string[] = [];
+      const results: UploadFileResult[] = [];
 
       for (const file of files) {
-        // Fix lỗi phông chữ tiếng Việt từ Multer và chuẩn hóa NFC
-        const filename = basename(
-          Buffer.from(file.originalname, 'latin1').toString('utf8'),
-        ).normalize('NFC');
+        if (!file?.buffer || !file.originalname) {
+          throw new BadRequestException('File upload không hợp lệ');
+        }
 
-        const filePath = join(uploadDir, filename);
+        // Không dùng trực tiếp đường dẫn do client gửi lên.
+        const safeName = this.utf8FileName(file.originalname);
+        const targetPath = join(targetFolder, safeName);
 
-        // Ghi file vào ổ đĩa (chặn ghi đè bằng flag 'wx')
-        await writeFile(filePath, file.buffer, { flag: 'wx' });
+        await writeFile(targetPath, file.buffer);
 
-        uploadedFiles.push(join(this.options.uploadFolder, path, filename));
+        results.push({
+          name: safeName,
+          path: targetPath,
+          size: file.buffer.length,
+        });
       }
 
-      return uploadedFiles;
-    } catch (error: unknown) {
-      const err = error as { code?: string; message?: string };
-
-      if (err.code === 'EEXIST') {
-        throw new BadRequestException('File đã tồn tại trên hệ thống');
+      return results;
+    } catch (error) {
+      if (error instanceof BadRequestException) {
+        throw error;
       }
 
-      throw new InternalServerErrorException('Không thể lưu file upload');
+      throw new InternalServerErrorException('Không thể lưu các file upload');
     }
   }
 
   /**
-   * Lấy danh sách toàn bộ file trong thư mục chỉ định
+   * Đọc tất cả file trực tiếp trong folder.
+   * Trả về nội dung từng file dưới dạng Buffer.
    */
-  async getFiles(
-    path = '',
-  ): Promise<{ name: string; path: string; buffer: Buffer }[]> {
-    const rootDir = resolve(process.cwd(), this.options.uploadFolder);
-    const targetDir = resolve(rootDir, path);
+  async getFiles(folderPath?: string): Promise<StoredFile[]> {
+    const targetFolder = this.resolveFolder(folderPath);
 
-    if (targetDir !== rootDir && !targetDir.startsWith(rootDir + sep)) {
-      throw new BadRequestException('Folder path không hợp lệ');
-    }
-
-    const files: { name: string; path: string; buffer: Buffer }[] = [];
-
-    const readDirectory = async (directory: string): Promise<void> => {
-      const entries = await readdir(directory, {
+    try {
+      const entries = await readdir(targetFolder, {
         withFileTypes: true,
       });
 
-      for (const entry of entries) {
-        const fullPath = join(directory, entry.name);
+      const files = entries.filter((entry) => entry.isFile());
 
-        if (entry.isDirectory()) {
-          await readDirectory(fullPath);
-        } else if (entry.isFile()) {
-          const buffer = await readFile(fullPath);
+      return await Promise.all(
+        files.map(async (entry) => {
+          const filePath = join(targetFolder, entry.name);
+          const [buffer, fileStat] = await Promise.all([
+            readFile(filePath),
+            stat(filePath),
+          ]);
 
-          files.push({
+          return {
             name: entry.name,
-            path: relative(rootDir, fullPath),
             buffer,
-          });
-        }
-      }
-    };
-
-    await readDirectory(targetDir);
-
-    return files;
+            size: fileStat.size,
+          };
+        }),
+      );
+    } catch (error) {
+      throw new InternalServerErrorException(
+        'Không thể đọc các file trong folder',
+      );
+    }
   }
 
-  /**
-   * Lấy thông tin file trả về dạng buffer (nếu cần xử lý dữ liệu thô)
-   */
-  async getFileByPath(
-    filePath: string,
-  ): Promise<{ name: string; buffer: Buffer }> {
-    const rootDir = resolve(process.cwd(), this.options.uploadFolder);
-    const decodedPath = decodeURIComponent(filePath);
-    let targetPath = resolve(rootDir, decodedPath);
+  private resolveFolder(folderPath?: string): string {
+    const baseFolder = resolve(this.options.uploadFolder);
+    const targetFolder = resolve(baseFolder, folderPath ?? '.');
 
-    if (!targetPath.startsWith(rootDir + sep)) {
-      throw new BadRequestException('Đường dẫn file không hợp lệ');
+    // Chặn đường dẫn thoát khỏi uploadFolder.
+    if (
+      targetFolder !== baseFolder &&
+      !targetFolder.startsWith(baseFolder + '\\') &&
+      !targetFolder.startsWith(baseFolder + '/')
+    ) {
+      throw new BadRequestException('Folder path không hợp lệ');
     }
 
-    try {
-      await stat(targetPath.normalize('NFC'));
-    } catch {
-      try {
-        const dirName = dirname(targetPath);
-        const requestedFilename = basename(targetPath);
-        const entries = await readdir(dirName, { withFileTypes: true });
-        let matchedFilename: string | null = null;
-
-        for (const entry of entries) {
-          if (
-            entry.isFile() &&
-            (entry.name.normalize('NFC') ===
-              requestedFilename.normalize('NFC') ||
-              entry.name.normalize('NFD') ===
-                requestedFilename.normalize('NFD'))
-          ) {
-            matchedFilename = entry.name;
-            break;
-          }
-        }
-
-        if (matchedFilename) {
-          targetPath = join(dirName, matchedFilename);
-        } else {
-          throw new Error('Not found');
-        }
-      } catch {
-        throw new BadRequestException(
-          'File không tồn tại hoặc không thể đọc file',
-        );
-      }
-    }
-
-    const buffer = await readFile(targetPath);
-    return {
-      name: basename(targetPath),
-      buffer,
-    };
-  }
-
-  /**
-   * Hàm Stream file thông minh: Chống lỗi ENOENT, tự động khớp mã hóa Unicode (NFC/NFD)
-   * và quét thư mục tìm file thay thế nếu có sự khác biệt nhỏ về tên.
-   */
-  async getFileStream(
-    filePath: string,
-  ): Promise<{ stream: StreamableFile; filename: string }> {
-    const rootDir = resolve(process.cwd(), this.options.uploadFolder);
-    const decodedPath = decodeURIComponent(filePath);
-    let targetPath = resolve(rootDir, decodedPath);
-
-    // Chặn hành vi path traversal
-    if (!targetPath.startsWith(rootDir + sep)) {
-      throw new BadRequestException('Đường dẫn file không hợp lệ');
-    }
-
-    try {
-      // Thử tìm file theo chuẩn NFC trực tiếp
-      await stat(targetPath.normalize('NFC'));
-    } catch (error: unknown) {
-      // Nếu lỗi ENOENT, tiến hành quét thư mục cha để đối chiếu mã hóa Unicode
-      try {
-        const dirName = dirname(targetPath);
-        const requestedFilename = basename(targetPath);
-
-        const entries = await readdir(dirName, { withFileTypes: true });
-        let matchedFilename: string | null = null;
-
-        for (const entry of entries) {
-          if (entry.isFile()) {
-            if (
-              entry.name.normalize('NFC') ===
-                requestedFilename.normalize('NFC') ||
-              entry.name.normalize('NFD') === requestedFilename.normalize('NFD')
-            ) {
-              matchedFilename = entry.name;
-              break;
-            }
-          }
-        }
-
-        if (matchedFilename) {
-          targetPath = join(dirName, matchedFilename);
-        } else {
-          throw new Error('File not found');
-        }
-      } catch (scanError) {
-        throw new BadRequestException(
-          'File không tồn tại hoặc không thể đọc file',
-        );
-      }
-    }
-
-    // Trả về StreamableFile cho NestJS
-    const fileStream = createReadStream(targetPath);
-    const filename = basename(targetPath);
-
-    return {
-      stream: new StreamableFile(fileStream),
-      filename,
-    };
+    return targetFolder;
   }
 }
