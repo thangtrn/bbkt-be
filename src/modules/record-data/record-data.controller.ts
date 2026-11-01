@@ -86,4 +86,15 @@ export class RecordDataController {
   ): Promise<RecordDataResponseDto> {
     return await this.recordDataService.deleteRecordData(id);
   }
+
+  @ApiResponse({
+    status: HttpStatus.OK,
+    type: RecordDataResponseDto,
+  })
+  @Get('/:id/parser-to-templates')
+  async parserRecordToTemplates(
+    @Param('id') id: string,
+  ): Promise<RecordDataResponseDto> {
+    return await this.recordDataService.parserRecordToTemplates(id);
+  }
 }

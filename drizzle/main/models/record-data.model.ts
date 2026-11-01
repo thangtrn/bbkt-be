@@ -1,5 +1,5 @@
 import { InferInsertModel, InferSelectModel } from 'drizzle-orm';
-import { jsonb, pgTable, timestamp, uuid } from 'drizzle-orm/pg-core';
+import { jsonb, pgTable, timestamp, uuid, varchar } from 'drizzle-orm/pg-core';
 import { InferUpdateModel } from '@/core/types';
 import { recordSchemaModel } from './record-schema.model';
 
@@ -10,6 +10,8 @@ export const recordDataModel = pgTable('record_data', {
   schemaId: uuid('schema_id')
     .notNull()
     .references(() => recordSchemaModel.id, { onDelete: 'cascade' }),
+
+  name: varchar('name').notNull(),
 
   dataValues: jsonb('data_values').$type<Record<string, unknown>>().notNull(), // Lưu object dữ liệu thực tế (json số 2 của bạn)
 

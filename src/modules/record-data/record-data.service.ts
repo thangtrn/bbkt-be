@@ -78,4 +78,8 @@ export class RecordDataService {
 
     return record;
   }
+
+  async parserRecordToTemplates(id: string): Promise<any> {
+    return null;
+  }
 }

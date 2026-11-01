@@ -1,0 +1,1 @@
+ALTER TABLE "record_data" ADD COLUMN "name" varchar NOT NULL;

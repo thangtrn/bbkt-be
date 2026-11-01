@@ -18,6 +18,11 @@ export class CreateRecordDataRequestDto {
   @IsNotEmpty()
   schemaId!: string;
 
+  @ApiProperty({ example: 'LTT 1' })
+  @IsString()
+  @IsNotEmpty()
+  name!: string;
+
   @ApiProperty({
     description: 'Data of the record schema fields',
     example: {

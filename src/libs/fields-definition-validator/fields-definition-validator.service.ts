@@ -1,6 +1,5 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import {
-  FieldDefinition,
   FieldDefinitionType,
   FieldsDefinition,
   ValidationOptions,
@@ -10,6 +9,7 @@ import {
 export class FieldsDefinitionValidatorService {
   /**
    * Validate data theo fieldsDefinition.
+   * Validate luôn sources nếu data có truyền sources.
    *
    * @param data Data cần validate
    * @param definition Fields definition
@@ -28,6 +28,11 @@ export class FieldsDefinitionValidatorService {
       throw new BadRequestException('Invalid fields definition');
     }
 
+    if (!data || typeof data !== 'object' || Array.isArray(data)) {
+      throw new BadRequestException('Data must be an object');
+    }
+
+    // Validate các fields được định nghĩa
     for (const field of definition.fields) {
       const { field: fieldKey, name, type, required } = field;
 
@@ -35,7 +40,7 @@ export class FieldsDefinitionValidatorService {
 
       const value = data[fieldKey];
 
-      // Update: bỏ qua các field không được gửi lên
+      // Update: bỏ qua field không được gửi lên
       if (partial && !exists) {
         continue;
       }
@@ -43,6 +48,7 @@ export class FieldsDefinitionValidatorService {
       // Required
       if (required && this.isEmpty(value)) {
         errors.push(`${name} (${fieldKey}) is required`);
+
         continue;
       }
 
@@ -51,10 +57,17 @@ export class FieldsDefinitionValidatorService {
         continue;
       }
 
-      // Type validation
+      // Validate type
       if (!this.validateType(value, type)) {
         errors.push(`${name} (${fieldKey}) must be of type ${type}`);
       }
+    }
+
+    // Validate sources
+    const hasSources = Object.prototype.hasOwnProperty.call(data, 'sources');
+
+    if (hasSources) {
+      this.validateSources(data.sources, errors);
     }
 
     if (errors.length > 0) {
@@ -68,6 +81,98 @@ export class FieldsDefinitionValidatorService {
   }
 
   /**
+   * Validate sources.
+   */
+  private validateSources(sources: unknown, errors: string[]): void {
+    if (!sources || typeof sources !== 'object' || Array.isArray(sources)) {
+      errors.push('sources must be an object');
+      return;
+    }
+
+    const source = sources as Record<string, unknown>;
+
+    // rootFolder
+    if (!this.isNonEmptyString(source.rootFolder)) {
+      errors.push('sources.rootFolder must be a non-empty string');
+    }
+
+    // Excel
+    this.validateExcelSource(source.excel, errors);
+
+    // DOCX
+    this.validateDocxSource(source.docx, errors);
+  }
+
+  /**
+   * Validate Excel source.
+   */
+  private validateExcelSource(excel: unknown, errors: string[]): void {
+    if (!excel || typeof excel !== 'object' || Array.isArray(excel)) {
+      errors.push('sources.excel must be an object');
+      return;
+    }
+
+    const source = excel as Record<string, unknown>;
+
+    const stringFields = ['folder', 'sheet', 'field', 'file'];
+
+    for (const key of stringFields) {
+      if (!this.isNonEmptyString(source[key])) {
+        errors.push(`sources.excel.${key} must be a non-empty string`);
+      }
+    }
+
+    if (
+      !Number.isInteger(source.headerRow) ||
+      (source.headerRow as number) < 1
+    ) {
+      errors.push('sources.excel.headerRow must be an integer greater than 0');
+    }
+
+    if (typeof source.required !== 'boolean') {
+      errors.push('sources.excel.required must be a boolean');
+    }
+  }
+
+  /**
+   * Validate DOCX source.
+   */
+  private validateDocxSource(docx: unknown, errors: string[]): void {
+    if (!docx || typeof docx !== 'object' || Array.isArray(docx)) {
+      errors.push('sources.docx must be an object');
+      return;
+    }
+
+    const source = docx as Record<string, unknown>;
+
+    if (!this.isNonEmptyString(source.folder)) {
+      errors.push('sources.docx.folder must be a non-empty string');
+    }
+
+    if (!Array.isArray(source.files)) {
+      errors.push('sources.docx.files must be an array');
+    } else {
+      if (source.required === true && source.files.length === 0) {
+        errors.push(
+          'sources.docx.files must not be empty when required is true',
+        );
+      }
+
+      source.files.forEach((file, index) => {
+        if (!this.isNonEmptyString(file)) {
+          errors.push(
+            `sources.docx.files[${index}] must be a non-empty string`,
+          );
+        }
+      });
+    }
+
+    if (typeof source.required !== 'boolean') {
+      errors.push('sources.docx.required must be a boolean');
+    }
+  }
+
+  /**
    * Kiểm tra giá trị rỗng.
    */
   private isEmpty(value: unknown): boolean {
@@ -76,6 +181,13 @@ export class FieldsDefinitionValidatorService {
       value === null ||
       (typeof value === 'string' && value.trim() === '')
     );
+  }
+
+  /**
+   * Kiểm tra string không rỗng.
+   */
+  private isNonEmptyString(value: unknown): value is string {
+    return typeof value === 'string' && value.trim().length > 0;
   }
 
   /**
@@ -120,7 +232,7 @@ export class FieldsDefinitionValidatorService {
       return false;
     }
 
-    // Hỗ trợ dd/MM/yyyy
+    // dd/MM/yyyy
     const vietnameseDateRegex = /^(\d{2})\/(\d{2})\/(\d{4})$/;
 
     const match = value.match(vietnameseDateRegex);
@@ -139,7 +251,7 @@ export class FieldsDefinitionValidatorService {
       );
     }
 
-    // Hỗ trợ ISO date: yyyy-MM-dd
+    // yyyy-MM-dd
     const isoDateRegex = /^\d{4}-\d{2}-\d{2}$/;
 
     if (isoDateRegex.test(value)) {

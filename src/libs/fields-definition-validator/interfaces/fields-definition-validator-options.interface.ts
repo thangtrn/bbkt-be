@@ -26,4 +26,25 @@ export interface ValidationOptions {
   partial?: boolean;
 }
 
+export interface ExcelSource {
+  folder: string;
+  sheet: string;
+  field: string;
+  file: string;
+  headerRow: number;
+  required: boolean;
+}
+
+export interface DocxSource {
+  folder: string;
+  files: string[];
+  required: boolean;
+}
+
+export interface RecordDataSources {
+  rootFolder: string;
+  excel: ExcelSource;
+  docx: DocxSource;
+}
+
 export interface FieldsDefinitionValidatorOptions {}
