@@ -20,7 +20,7 @@ import {
 import { RecordDataResponseDto } from './dtos/record-data.response.dto';
 import { RecordDataService } from './record-data.service';
 
-@Controller('record-schema')
+@Controller('record-data')
 export class RecordDataController {
   constructor(private recordDataService: RecordDataService) {}
 
@@ -68,7 +68,7 @@ export class RecordDataController {
     status: HttpStatus.OK,
     type: RecordDataResponseDto,
   })
-  @Put()
+  @Put(':id')
   async updateRecordData(
     @Param('id') id: string,
     @Body() dto: UpdateRecordDataRequestDto,

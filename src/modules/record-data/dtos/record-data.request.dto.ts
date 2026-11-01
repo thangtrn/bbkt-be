@@ -3,6 +3,7 @@ import { RecordDataModel } from '@drizzle/main';
 import {
   IsArray,
   IsNotEmpty,
+  IsObject,
   IsString,
   MaxLength,
   ValidateIf,
@@ -12,7 +13,7 @@ import { FilterDto } from '@/core/dtos';
 export class FindRecordDataRequestDto extends FilterDto<RecordDataModel> {}
 
 export class CreateRecordDataRequestDto {
-  @ApiProperty({ example: 'uuid-123' })
+  @ApiProperty({ example: 'f8cc3e0e-c33a-4543-96fa-baf504e5ee61' })
   @IsString()
   @IsNotEmpty()
   schemaId!: string;
@@ -46,17 +47,11 @@ export class CreateRecordDataRequestDto {
     },
   })
   @IsNotEmpty()
-  @ValidateIf((_, value) => Array.isArray(value))
-  @IsArray()
-  @IsNotEmpty()
-  dataValues!: Record<string, unknown>[];
+  @ValidateIf((_, value) => !Array.isArray(value))
+  @IsObject()
+  dataValues!: Record<string, unknown>;
 }
 
 export class UpdateRecordDataRequestDto extends PartialType(
   CreateRecordDataRequestDto,
-) {
-  @ApiProperty({ example: 'uuid-123' })
-  @IsString()
-  @IsNotEmpty()
-  id!: string;
-}
+) {}

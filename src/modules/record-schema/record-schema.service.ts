@@ -1,5 +1,9 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { InsertRecordSchemaModel, RecordSchemaModel } from '@drizzle/main';
+import {
+  InsertRecordSchemaModel,
+  RecordSchemaModel,
+  UpdateRecordSchemaModel,
+} from '@drizzle/main';
 import { QueryParams } from '@/core/repositories/drizzle-client.repository.port';
 import { RecordSchemaRepository } from './record-schema.repository';
 
@@ -23,10 +27,9 @@ export class RecordSchemaService {
 
   async updateRecordSchema(
     id: string,
-    entity: Partial<InsertRecordSchemaModel>,
+    entity: UpdateRecordSchemaModel,
   ): Promise<RecordSchemaModel> {
-    const { id: _id, ...props } = entity;
-    const record = await this.recordSchemaRepo.update(id, props);
+    const record = await this.recordSchemaRepo.update(id, entity);
 
     if (!record) {
       throw new NotFoundException('Record schema not found');

@@ -68,7 +68,7 @@ export class RecordSchemaController {
     status: HttpStatus.OK,
     type: RecordSchemaResponseDto,
   })
-  @Put()
+  @Put(':id')
   async updateRecordSchema(
     @Param('id') id: string,
     @Body() dto: UpdateRecordSchemaRequestDto,

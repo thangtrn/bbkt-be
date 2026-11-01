@@ -167,9 +167,4 @@ export class CreateRecordSchemaRequestDto {
 
 export class UpdateRecordSchemaRequestDto extends PartialType(
   CreateRecordSchemaRequestDto,
-) {
-  @ApiProperty({ example: 'uuid-123' })
-  @IsString()
-  @IsNotEmpty()
-  id!: string;
-}
+) {}
