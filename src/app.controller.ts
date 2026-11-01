@@ -27,7 +27,7 @@ export class AppController {
     schema: {
       type: 'object',
       properties: {
-        folderPath: {
+        folder: {
           type: 'string',
           example: './templates',
         },
@@ -41,32 +41,24 @@ export class AppController {
           },
         },
       },
-      required: ['folderPath', 'data'],
+      required: ['folder', 'data'],
     },
   })
   async renderTemplate(
     @Body()
     body: {
-      folderPath: string;
+      folder: string;
       data: Record<string, unknown>;
     },
     @Res() res: Response,
   ): Promise<void> {
-    const { folderPath, data } = body;
+    const { folder, data } = body;
 
-    if (
-      !folderPath ||
-      !data ||
-      typeof data !== 'object' ||
-      Array.isArray(data)
-    ) {
-      throw new BadRequestException('Cần truyền folderPath và data hợp lệ');
+    if (!folder || !data || typeof data !== 'object' || Array.isArray(data)) {
+      throw new BadRequestException('Cần truyền folder và data hợp lệ');
     }
 
-    const files = await this.docxtemplaterService.renderTemplate(
-      data,
-      folderPath,
-    );
+    const files = await this.docxtemplaterService.renderTemplate(data, folder);
 
     if (!files.length) {
       throw new BadRequestException('Không tìm thấy file .docx trong folder');

@@ -95,17 +95,17 @@ export class DocxtemplaterService {
    */
   async renderTemplate<T extends Record<string, unknown>>(
     data: T,
-    folderPath: string,
+    folder: string,
   ): Promise<RenderedFile[]> {
     if (!data || typeof data !== 'object' || Array.isArray(data)) {
       throw new BadRequestException('Data phải là một object');
     }
 
-    if (!folderPath?.trim()) {
-      throw new BadRequestException('folderPath không hợp lệ');
+    if (!folder?.trim()) {
+      throw new BadRequestException('folder không hợp lệ');
     }
 
-    const targetFolder = resolve(folderPath);
+    const targetFolder = resolve(folder);
 
     try {
       const entries = await readdir(targetFolder, {

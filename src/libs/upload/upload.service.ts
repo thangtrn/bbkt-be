@@ -38,13 +38,13 @@ export class UploadService {
    */
   async uploadFiles(
     files: Express.Multer.File[],
-    folderPath?: string,
+    folder?: string,
   ): Promise<UploadFileResult[]> {
     if (!files?.length) {
       throw new BadRequestException('Không có file để upload');
     }
 
-    const targetFolder = this.resolveFolder(folderPath);
+    const targetFolder = this.resolveFolder(folder);
 
     try {
       await mkdir(targetFolder, { recursive: true });
@@ -83,8 +83,8 @@ export class UploadService {
    * Đọc tất cả file trực tiếp trong folder.
    * Trả về nội dung từng file dưới dạng Buffer.
    */
-  async getFiles(folderPath?: string): Promise<StoredFile[]> {
-    const targetFolder = this.resolveFolder(folderPath);
+  async getFiles(folder?: string): Promise<StoredFile[]> {
+    const targetFolder = this.resolveFolder(folder);
 
     try {
       const entries = await readdir(targetFolder, {
@@ -115,9 +115,9 @@ export class UploadService {
     }
   }
 
-  private resolveFolder(folderPath?: string): string {
+  private resolveFolder(folder?: string): string {
     const baseFolder = resolve(this.options.uploadFolder);
-    const targetFolder = resolve(baseFolder, folderPath ?? '.');
+    const targetFolder = resolve(baseFolder, folder ?? '.');
 
     // Chặn đường dẫn thoát khỏi uploadFolder.
     if (
