@@ -3,9 +3,17 @@ import {
   Inject,
   Injectable,
   InternalServerErrorException,
+  NotFoundException,
 } from '@nestjs/common';
-import { mkdir, readdir, readFile, stat, writeFile } from 'node:fs/promises';
-import { basename, join, resolve } from 'node:path';
+import {
+  mkdir,
+  readdir,
+  readFile,
+  stat,
+  unlink,
+  writeFile,
+} from 'node:fs/promises';
+import { basename, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { UploadOptions } from './interfaces';
 import { UPLOAD_MODULE_OPTIONS } from './upload.module-definition';
 
@@ -33,8 +41,8 @@ export class UploadService {
   }
 
   /**
-   * Lưu nhiều file vào folder.
-   * files là danh sách file từ Multer.
+   * Upload nhiều file vào folder.
+   * Trả về relative path từ uploadFolder.
    */
   async uploadFiles(
     files: Express.Multer.File[],
@@ -45,6 +53,7 @@ export class UploadService {
     }
 
     const targetFolder = this.resolveFolder(folder);
+    const baseFolder = resolve(this.options.uploadFolder);
 
     try {
       await mkdir(targetFolder, { recursive: true });
@@ -56,15 +65,18 @@ export class UploadService {
           throw new BadRequestException('File upload không hợp lệ');
         }
 
-        // Không dùng trực tiếp đường dẫn do client gửi lên.
         const safeName = this.utf8FileName(file.originalname);
         const targetPath = join(targetFolder, safeName);
 
         await writeFile(targetPath, file.buffer);
 
+        const relativePath = relative(baseFolder, targetPath)
+          .split(sep)
+          .join('/');
+
         results.push({
           name: safeName,
-          path: targetPath,
+          path: `/${relativePath}`,
           size: file.buffer.length,
         });
       }
@@ -80,54 +92,141 @@ export class UploadService {
   }
 
   /**
-   * Đọc tất cả file trực tiếp trong folder.
-   * Trả về nội dung từng file dưới dạng Buffer.
+   * Xóa nhiều file bằng relative path.
    */
-  async getFiles(folder?: string): Promise<StoredFile[]> {
-    const targetFolder = this.resolveFolder(folder);
+  async deleteFiles(paths: string[]): Promise<string[]> {
+    if (!Array.isArray(paths) || paths.length === 0) {
+      throw new BadRequestException('Danh sách path không hợp lệ');
+    }
+
+    const deletedPaths: string[] = [];
+
+    for (const filePath of paths) {
+      const safePath = this.resolveFilePath(filePath);
+
+      try {
+        await unlink(safePath);
+
+        deletedPaths.push(
+          `/${relative(resolve(this.options.uploadFolder), safePath)
+            .split(sep)
+            .join('/')}`,
+        );
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+          throw new NotFoundException(`Không tìm thấy file: ${filePath}`);
+        }
+
+        throw new InternalServerErrorException(
+          `Không thể xóa file: ${filePath}`,
+        );
+      }
+    }
+
+    return deletedPaths;
+  }
+
+  /**
+   * Lấy nội dung một file bằng relative path.
+   */
+  async getFile(filePath: string): Promise<StoredFile> {
+    const safePath = this.resolveFilePath(filePath);
 
     try {
-      const entries = await readdir(targetFolder, {
-        withFileTypes: true,
-      });
+      const fileStat = await stat(safePath);
 
-      const files = entries.filter((entry) => entry.isFile());
+      if (!fileStat.isFile()) {
+        throw new NotFoundException('Path không phải file');
+      }
 
-      return await Promise.all(
-        files.map(async (entry) => {
-          const filePath = join(targetFolder, entry.name);
-          const [buffer, fileStat] = await Promise.all([
-            readFile(filePath),
-            stat(filePath),
-          ]);
+      const buffer = await readFile(safePath);
 
-          return {
-            name: entry.name,
-            buffer,
-            size: fileStat.size,
-          };
-        }),
-      );
+      return {
+        name: basename(safePath),
+        buffer,
+        size: fileStat.size,
+      };
     } catch (error) {
-      throw new InternalServerErrorException(
-        'Không thể đọc các file trong folder',
-      );
+      if (
+        error instanceof NotFoundException ||
+        error instanceof BadRequestException
+      ) {
+        throw error;
+      }
+
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+        throw new NotFoundException('Không tìm thấy file');
+      }
+
+      throw new InternalServerErrorException('Không thể đọc file');
     }
   }
 
+  /**
+   * Kiểm tra folder nằm trong uploadFolder.
+   */
   private resolveFolder(folder?: string): string {
     const baseFolder = resolve(this.options.uploadFolder);
-    const targetFolder = resolve(baseFolder, folder ?? '.');
 
-    // Chặn đường dẫn thoát khỏi uploadFolder.
+    const normalizedFolder = (folder ?? '.')
+      .replace(/\\/g, '/')
+      .replace(/^\/+/, '');
+
+    const targetFolder = resolve(baseFolder, normalizedFolder);
+    const relativePath = relative(baseFolder, targetFolder);
+
     if (
-      targetFolder !== baseFolder &&
-      !targetFolder.startsWith(baseFolder + '\\') &&
-      !targetFolder.startsWith(baseFolder + '/')
+      relativePath === '..' ||
+      relativePath.startsWith(`..${sep}`) ||
+      isAbsolute(relativePath)
     ) {
       throw new BadRequestException('Folder path không hợp lệ');
     }
 
     return targetFolder;
+  }
+
+  /**
+   * Chuyển relative path thành absolute path an toàn.
+   */
+
+  private resolveFilePath(filePath: string): string {
+    const baseFolder = resolve(this.options.uploadFolder);
+
+    if (typeof filePath !== 'string' || !filePath.trim()) {
+      throw new BadRequestException('File path không hợp lệ');
+    }
+
+    const normalizedPath = filePath
+      .trim()
+      .replace(/\\/g, '/')
+      .replace(/^\/+/, '');
+
+    // Chặn Windows absolute path và UNC path.
+    if (
+      /^[a-zA-Z]:/.test(normalizedPath) ||
+      filePath.trim().startsWith('\\\\')
+    ) {
+      throw new BadRequestException('File path không hợp lệ');
+    }
+
+    // Chặn path traversal.
+    if (normalizedPath.split('/').some((segment) => segment === '..')) {
+      throw new BadRequestException('File path không hợp lệ');
+    }
+
+    const targetPath = resolve(baseFolder, normalizedPath);
+    const relativePath = relative(baseFolder, targetPath);
+
+    if (
+      !relativePath ||
+      relativePath === '..' ||
+      relativePath.startsWith(`..${sep}`) ||
+      isAbsolute(relativePath)
+    ) {
+      throw new BadRequestException('File path không hợp lệ');
+    }
+
+    return targetPath;
   }
 }
