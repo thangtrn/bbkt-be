@@ -46,7 +46,12 @@ async function bootstrap(): Promise<void> {
     }),
   );
 
-  app.enableCors();
+  app.enableCors({
+    origin: ['http://localhost:3000'],
+    credentials: true,
+    methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+  });
   app.enableShutdownHooks();
 
   await app.listen(systemConfig.port);

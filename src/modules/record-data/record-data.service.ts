@@ -7,7 +7,6 @@ import {
 import { QueryParams } from '@/core/repositories/drizzle-client.repository.port';
 import { DocxtemplaterService } from '@/libs/docxtemplater/docxtemplater.service';
 import { FieldsDefinitionValidatorService } from '@/libs/fields-definition-validator/fields-definition-validator.service';
-import { UploadService } from '@/libs/upload/upload.service';
 import { RecordSchemaRepository } from '../record-schema/record-schema.repository';
 import { RecordDataRepository } from './record-data.repository';
 
@@ -18,7 +17,6 @@ export class RecordDataService {
     private readonly recordSchemaRepo: RecordSchemaRepository,
     private readonly validator: FieldsDefinitionValidatorService,
     private readonly docxtemplaterService: DocxtemplaterService,
-    private readonly uploadService: UploadService,
   ) {}
 
   async findRecordData(id: string): Promise<RecordDataModel> {
