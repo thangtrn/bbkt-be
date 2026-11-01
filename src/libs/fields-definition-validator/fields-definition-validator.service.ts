@@ -1,7 +1,9 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import {
+  FieldDefinition,
   FieldDefinitionType,
   FieldsDefinition,
+  RecordDataSources,
   ValidationOptions,
 } from './interfaces';
 
@@ -66,8 +68,8 @@ export class FieldsDefinitionValidatorService {
     // Validate sources
     const hasSources = Object.prototype.hasOwnProperty.call(data, 'sources');
 
-    if (hasSources) {
-      this.validateSources(data.sources, errors);
+    if (hasSources && definition.sources) {
+      this.validateSources(data.sources, definition.sources, errors);
     }
 
     if (errors.length > 0) {
@@ -83,92 +85,57 @@ export class FieldsDefinitionValidatorService {
   /**
    * Validate sources.
    */
-  private validateSources(sources: unknown, errors: string[]): void {
+  private validateSources(
+    sources: unknown,
+    schemaSources: RecordDataSources,
+    errors: string[],
+  ): void {
+    // Kiểm tra sources là object
     if (!sources || typeof sources !== 'object' || Array.isArray(sources)) {
-      errors.push('sources must be an object');
+      if (schemaSources.excel.required || schemaSources.docx.required) {
+        errors.push('sources must be an object');
+      }
       return;
     }
 
     const source = sources as Record<string, unknown>;
 
-    // rootFolder
-    if (!this.isNonEmptyString(source.rootFolder)) {
-      errors.push('sources.rootFolder must be a non-empty string');
-    }
+    // Validate Excel
+    if (schemaSources.excel.required) {
+      const excel = source.excel;
 
-    // Excel
-    this.validateExcelSource(source.excel, errors);
+      if (!excel || typeof excel !== 'object' || Array.isArray(excel)) {
+        errors.push('Excel source is required');
+      } else {
+        const excelSource = excel as Record<string, unknown>;
 
-    // DOCX
-    this.validateDocxSource(source.docx, errors);
-  }
-
-  /**
-   * Validate Excel source.
-   */
-  private validateExcelSource(excel: unknown, errors: string[]): void {
-    if (!excel || typeof excel !== 'object' || Array.isArray(excel)) {
-      errors.push('sources.excel must be an object');
-      return;
-    }
-
-    const source = excel as Record<string, unknown>;
-
-    const stringFields = ['folder', 'sheet', 'field', 'file'];
-
-    for (const key of stringFields) {
-      if (!this.isNonEmptyString(source[key])) {
-        errors.push(`sources.excel.${key} must be a non-empty string`);
-      }
-    }
-
-    if (
-      !Number.isInteger(source.headerRow) ||
-      (source.headerRow as number) < 1
-    ) {
-      errors.push('sources.excel.headerRow must be an integer greater than 0');
-    }
-
-    if (typeof source.required !== 'boolean') {
-      errors.push('sources.excel.required must be a boolean');
-    }
-  }
-
-  /**
-   * Validate DOCX source.
-   */
-  private validateDocxSource(docx: unknown, errors: string[]): void {
-    if (!docx || typeof docx !== 'object' || Array.isArray(docx)) {
-      errors.push('sources.docx must be an object');
-      return;
-    }
-
-    const source = docx as Record<string, unknown>;
-
-    if (!this.isNonEmptyString(source.folder)) {
-      errors.push('sources.docx.folder must be a non-empty string');
-    }
-
-    if (!Array.isArray(source.files)) {
-      errors.push('sources.docx.files must be an array');
-    } else {
-      if (source.required === true && source.files.length === 0) {
-        errors.push(
-          'sources.docx.files must not be empty when required is true',
-        );
-      }
-
-      source.files.forEach((file, index) => {
-        if (!this.isNonEmptyString(file)) {
-          errors.push(
-            `sources.docx.files[${index}] must be a non-empty string`,
-          );
+        if (!this.isNonEmptyString(excelSource.file)) {
+          errors.push('sources.excel.file is required');
         }
-      });
+      }
     }
 
-    if (typeof source.required !== 'boolean') {
-      errors.push('sources.docx.required must be a boolean');
+    // Validate DOCX
+    if (schemaSources.docx.required) {
+      const docx = source.docx;
+
+      if (!docx || typeof docx !== 'object' || Array.isArray(docx)) {
+        errors.push('DOCX source is required');
+      } else {
+        const docxSource = docx as Record<string, unknown>;
+
+        if (!Array.isArray(docxSource.files) || docxSource.files.length === 0) {
+          errors.push('sources.docx.files is required');
+        } else {
+          docxSource.files.forEach((file, index) => {
+            if (!this.isNonEmptyString(file)) {
+              errors.push(
+                `sources.docx.files[${index}] must be a non-empty string`,
+              );
+            }
+          });
+        }
+      }
     }
   }
 

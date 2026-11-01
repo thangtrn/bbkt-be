@@ -4,7 +4,7 @@ import { BaseResponseDto } from '@/core/dtos';
 export class RecordDataResponseDto extends BaseResponseDto {
   @ApiProperty({
     description: 'Name of the record schema',
-    example: 'f8cc3e0e-c33a-4543-96fa-baf504e5ee61',
+    example: '430b2638-e052-4b24-bebd-a4f8e5b3f323',
   })
   readonly schemaId!: string;
 

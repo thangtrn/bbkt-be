@@ -16,6 +16,7 @@ export interface FieldDefinition {
 export interface FieldsDefinition {
   fields: FieldDefinition[];
   version?: number;
+  sources?: RecordDataSources;
 }
 
 export interface ValidationOptions {

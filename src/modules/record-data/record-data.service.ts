@@ -5,7 +5,9 @@ import {
   UpdateRecordDataModel,
 } from '@drizzle/main';
 import { QueryParams } from '@/core/repositories/drizzle-client.repository.port';
+import { DocxtemplaterService } from '@/libs/docxtemplater/docxtemplater.service';
 import { FieldsDefinitionValidatorService } from '@/libs/fields-definition-validator/fields-definition-validator.service';
+import { UploadService } from '@/libs/upload/upload.service';
 import { RecordSchemaRepository } from '../record-schema/record-schema.repository';
 import { RecordDataRepository } from './record-data.repository';
 
@@ -15,6 +17,8 @@ export class RecordDataService {
     private readonly recordDataRepo: RecordDataRepository,
     private readonly recordSchemaRepo: RecordSchemaRepository,
     private readonly validator: FieldsDefinitionValidatorService,
+    private readonly docxtemplaterService: DocxtemplaterService,
+    private readonly uploadService: UploadService,
   ) {}
 
   async findRecordData(id: string): Promise<RecordDataModel> {
@@ -80,6 +84,31 @@ export class RecordDataService {
   }
 
   async parserRecordToTemplates(id: string): Promise<any> {
-    return null;
+    const recordData = await this.recordDataRepo.findOneById(id);
+    const recordSchema = await this.recordSchemaRepo.findOneById(
+      recordData.schemaId,
+    );
+
+    if (!recordData || !recordSchema) {
+      throw new NotFoundException('Record data not found');
+    }
+
+    const excelData = await this.docxtemplaterService.parserExcelToJson(
+      recordData.dataValues.sources.excel.file,
+      recordSchema.fieldsDefinition.sources.excel,
+    );
+
+    const data = {
+      ...recordData.dataValues,
+      [recordSchema.fieldsDefinition.sources.excel.field]: excelData,
+    };
+
+    const result = await this.docxtemplaterService.renderDocxTemplate(
+      data,
+      `${recordSchema.fieldsDefinition.sources.rootFolder}/${recordSchema.fieldsDefinition.sources.docx.folder}`,
+      recordData.id,
+    );
+
+    return result;
   }
 }

@@ -22,72 +22,72 @@ export class AppController {
     private readonly uploadService: UploadService,
   ) {}
 
-  @Post('render-template')
-  @ApiBody({
-    schema: {
-      type: 'object',
-      properties: {
-        folder: {
-          type: 'string',
-          example: './templates',
-        },
-        data: {
-          type: 'object',
-          example: {
-            HoTen: 'Nguyen Van A',
-            MaNV: 'NV001',
-            PhongBan: 'IT',
-            Luong: 15000000,
-          },
-        },
-      },
-      required: ['folder', 'data'],
-    },
-  })
-  async renderTemplate(
-    @Body()
-    body: {
-      folder: string;
-      data: Record<string, unknown>;
-    },
-    @Res() res: Response,
-  ): Promise<void> {
-    const { folder, data } = body;
+  //   @Post('render-template')
+  //   @ApiBody({
+  //     schema: {
+  //       type: 'object',
+  //       properties: {
+  //         folder: {
+  //           type: 'string',
+  //           example: './templates',
+  //         },
+  //         data: {
+  //           type: 'object',
+  //           example: {
+  //             HoTen: 'Nguyen Van A',
+  //             MaNV: 'NV001',
+  //             PhongBan: 'IT',
+  //             Luong: 15000000,
+  //           },
+  //         },
+  //       },
+  //       required: ['folder', 'data'],
+  //     },
+  //   })
+  //   async renderTemplate(
+  //     @Body()
+  //     body: {
+  //       folder: string;
+  //       data: Record<string, unknown>;
+  //     },
+  //     @Res() res: Response,
+  //   ): Promise<void> {
+  //     const { folder, data } = body;
 
-    if (!folder || !data || typeof data !== 'object' || Array.isArray(data)) {
-      throw new BadRequestException('Cần truyền folder và data hợp lệ');
-    }
+  //     if (!folder || !data || typeof data !== 'object' || Array.isArray(data)) {
+  //       throw new BadRequestException('Cần truyền folder và data hợp lệ');
+  //     }
 
-    const files = await this.docxtemplaterService.renderTemplate(data, folder);
+  //     const files = await this.docxtemplaterService.renderTemplate(data, folder);
 
-    if (!files.length) {
-      throw new BadRequestException('Không tìm thấy file .docx trong folder');
-    }
+  //     if (!files.length) {
+  //       throw new BadRequestException('Không tìm thấy file .docx trong folder');
+  //     }
 
-    // Tạo ZIP bằng PizZip
-    const zip = new PizZip();
+  //     // Tạo ZIP bằng PizZip
+  //     const zip = new PizZip();
 
-    for (const file of files) {
-      zip.file(file.name, file.buffer);
-    }
+  //     for (const file of files) {
+  //       zip.file(file.name, file.buffer);
+  //     }
 
-    const zipBuffer = zip.generate({
-      type: 'nodebuffer',
-      compression: 'DEFLATE',
-      compressionOptions: {
-        level: 6,
-      },
-    });
+  //     const zipBuffer = zip.generate({
+  //       type: 'nodebuffer',
+  //       compression: 'DEFLATE',
+  //       compressionOptions: {
+  //         level: 6,
+  //       },
+  //     });
 
-    res.setHeader('Content-Type', 'application/zip');
-    res.setHeader(
-      'Content-Disposition',
-      'attachment; filename="rendered-templates.zip"',
-    );
-    res.setHeader('Content-Length', zipBuffer.length);
+  //     res.setHeader('Content-Type', 'application/zip');
+  //     res.setHeader(
+  //       'Content-Disposition',
+  //       'attachment; filename="rendered-templates.zip"',
+  //     );
+  //     res.setHeader('Content-Length', zipBuffer.length);
 
-    res.end(zipBuffer);
-  }
+  //     res.end(zipBuffer);
+  //   }
 
   @Post('upload-template-data')
   @ApiConsumes('multipart/form-data')

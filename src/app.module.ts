@@ -6,7 +6,7 @@ import { HttpExceptionFilter } from '@/core/exceptions/http.exception';
 import { ContextInterceptor } from '@/core/interceptors/context.interceptor';
 import { LoggerInterceptor } from '@/core/interceptors/logger.interceptor';
 import { DrizzleClientModule } from '@/libs/drizzle-client/drizzle-client.module';
-import { AppController } from './app.controller';
+// import { AppController } from './app.controller';
 import { uploadConfig } from './configs/upload.config';
 import { DocxtemplaterModule } from './libs/docxtemplater/docxtemplater.module';
 import { UploadModule } from './libs/upload/upload.module';
@@ -40,7 +40,9 @@ const interceptors = [
     RecordSchemaModule,
     RecordDataModule,
   ],
-  controllers: [AppController],
+  controllers: [
+    // AppController
+  ],
   providers: [...interceptors],
 })
 export class AppModule {}

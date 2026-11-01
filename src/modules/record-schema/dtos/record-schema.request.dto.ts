@@ -88,7 +88,7 @@ export class CreateRecordSchemaRequestDto {
           mapping: [
             {
               column: 'TT',
-              field: 'TT',
+              field: 'tt',
               type: 'number',
             },
             {
@@ -97,7 +97,7 @@ export class CreateRecordSchemaRequestDto {
               type: 'string',
             },
             {
-              column: 'NamSinh',
+              column: 'Năm sinh',
               field: 'namSinh',
               type: 'string',
             },
