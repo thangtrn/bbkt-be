@@ -1,4 +1,5 @@
 import { Global, Module } from '@nestjs/common';
+import { MinioModule } from '../minio/minio.module';
 import { DocxtemplaterModuleClass } from './docxtemplater.module-definition';
 import { DocxtemplaterService } from './docxtemplater.service';
 

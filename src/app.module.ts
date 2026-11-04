@@ -6,12 +6,13 @@ import { HttpExceptionFilter } from '@/core/exceptions/http.exception';
 import { ContextInterceptor } from '@/core/interceptors/context.interceptor';
 import { LoggerInterceptor } from '@/core/interceptors/logger.interceptor';
 import { DrizzleClientModule } from '@/libs/drizzle-client/drizzle-client.module';
+import { minioConfig } from './configs/minio.config';
 import { uploadConfig } from './configs/upload.config';
 import { DocxtemplaterModule } from './libs/docxtemplater/docxtemplater.module';
-import { UploadModule } from './libs/upload/upload.module';
+import { MinioModule } from './libs/minio/minio.module';
 import { RecordDataModule } from './modules/record-data/record-data.module';
 import { RecordSchemaModule } from './modules/record-schema/record-schema.module';
-import { UploadFileModule } from './modules/upload-file/upload-file.module';
+import { UploadModule } from './modules/upload/upload.module';
 
 const interceptors = [
   {
@@ -35,11 +36,11 @@ const interceptors = [
       databaseUrl: databaseConfig.databaseUrl,
     }),
     DocxtemplaterModule.forRoot({}),
-    UploadModule.forRoot(uploadConfig),
+    MinioModule.forRoot(minioConfig),
 
     RecordSchemaModule,
     RecordDataModule,
-    UploadFileModule,
+    UploadModule,
   ],
   controllers: [],
   providers: [...interceptors],

@@ -5,12 +5,12 @@ import {
   InternalServerErrorException,
   NotFoundException,
 } from '@nestjs/common';
-import { mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises';
-import { basename, dirname, extname, relative, resolve, sep } from 'node:path';
+import { extname, posix } from 'node:path';
 import Docxtemplater from 'docxtemplater';
+import { lookup } from 'mime-types';
 import PizZip from 'pizzip';
 import * as XLSX from 'xlsx';
-import { uploadConfig } from '@/configs/upload.config';
+import { MinioService } from '@/libs/minio/minio.service';
 import { angularParser } from './docxtemplate.parser';
 import { DOCXTEMPLATER_MODULE_OPTIONS } from './docxtemplater.module-definition';
 import { DocxtemplaterOptions } from './interfaces';
@@ -52,45 +52,41 @@ export class DocxtemplaterService {
   constructor(
     @Inject(DOCXTEMPLATER_MODULE_OPTIONS)
     private readonly options: DocxtemplaterOptions,
+
+    private readonly minioService: MinioService,
   ) {}
 
   /**
-   * Resolve file path.
+   * Normalize MinIO object key.
    *
    * Example:
-   * /LTT/excel/LTT.xlsx
-   * -> <process.cwd()>/LTT/excel/LTT.xlsx
-   *
-   * Windows absolute path is also supported.
+   * /LTT/data/LTT.xlsx -> LTT/data/LTT.xlsx
    */
-  private resolveFilePath(filePath: string): string {
-    if (!filePath?.trim()) {
-      throw new BadRequestException('File path không hợp lệ');
+  private normalizeObjectName(objectName: string): string {
+    if (!objectName?.trim()) {
+      throw new BadRequestException('Object name không hợp lệ');
     }
 
-    const normalizedPath = filePath.trim();
+    const normalized = objectName
+      .trim()
+      .replace(/\\/g, '/')
+      .replace(/^\/+/, '');
 
-    // Windows absolute path: C:\... or D:/...
-    if (/^[a-zA-Z]:[\\/]/.test(normalizedPath)) {
-      return resolve(normalizedPath);
+    const segments = normalized.split('/');
+
+    if (
+      segments.some(
+        (segment) => !segment || segment === '.' || segment === '..',
+      )
+    ) {
+      throw new BadRequestException('Invalid MinIO object name');
     }
 
-    // Project-relative path
-    return resolve(
-      process.cwd(),
-      uploadConfig.uploadFolder,
-      normalizedPath.replace(/^[/\\]+/, ''),
-    );
+    return segments.join('/');
   }
 
   /**
    * Read Excel to JSON.
-   *
-   * If sheet provided:
-   * Promise<ExcelRow[]>
-   *
-   * If sheet omitted:
-   * Promise<Record<string, ExcelRow[]>>
    */
   async loadExcelFile(
     excel: Buffer,
@@ -147,14 +143,7 @@ export class DocxtemplaterService {
   }
 
   /**
-   * Parse Excel file path to JSON using fieldsDefinition.sources.excel.
-   *
-   * Input:
-   * - filePath: record.data.sources.excel.file
-   * - definition: fieldsDefinition.sources.excel
-   *
-   * Output:
-   * ExcelRow[]
+   * Parse Excel from MinIO to JSON.
    */
   async parserExcelToJson(
     filePath: string,
@@ -182,24 +171,17 @@ export class DocxtemplaterService {
       );
     }
 
-    const targetPath = this.resolveFilePath(filePath);
-
-    console.log('Resolved Excel file path:', targetPath);
+    const objectName = this.normalizeObjectName(filePath);
 
     let excelBuffer: Buffer;
 
     try {
-      excelBuffer = await readFile(targetPath);
+      // Đọc trực tiếp từ MinIO
+      excelBuffer = await this.minioService.getFile(objectName);
     } catch (error) {
-      if (
-        error instanceof Error &&
-        'code' in error &&
-        error.code === 'ENOENT'
-      ) {
-        throw new NotFoundException(`Không tìm thấy file Excel: ${filePath}`);
-      }
-
-      throw new InternalServerErrorException('Không thể đọc file Excel');
+      throw new NotFoundException(
+        `Không tìm thấy hoặc không thể đọc file Excel: ${objectName}`,
+      );
     }
 
     try {
@@ -214,7 +196,6 @@ export class DocxtemplaterService {
         throw new BadRequestException(`Không tìm thấy sheet "${sheet}"`);
       }
 
-      // headerRow bắt đầu từ 1, range của XLSX bắt đầu từ 0.
       const rows = XLSX.utils.sheet_to_json<ExcelRow>(worksheet, {
         range: headerRow - 1,
         defval: '',
@@ -277,7 +258,6 @@ export class DocxtemplaterService {
 
         const text = String(value).trim();
 
-        // Already dd/MM/yyyy
         const match = text.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
 
         if (match) {
@@ -319,6 +299,18 @@ export class DocxtemplaterService {
     return `${day}/${month}/${year}`;
   }
 
+  /**
+   * Render all DOCX templates from MinIO folder.
+   *
+   * templatePath:
+   * LTT/templates
+   *
+   * outputPath:
+   * recordDataId
+   *
+   * Output:
+   * LTT/recordDataId/*.docx
+   */
   async renderDocxTemplate<T extends Record<string, unknown>>(
     data: T,
     templatePath: string,
@@ -334,77 +326,82 @@ export class DocxtemplaterService {
         throw new BadRequestException('Output path is required');
       }
 
-      // outputPath chỉ được là tên folder, không cho phép path traversal
+      // Output chỉ được là tên folder
       if (
-        basename(outputPath) !== outputPath ||
+        outputPath.includes('/') ||
+        outputPath.includes('\\') ||
         outputPath === '.' ||
         outputPath === '..'
       ) {
         throw new BadRequestException('Invalid output folder name');
       }
 
-      // 2. Resolve đường dẫn folder template
-      const templateDir = this.resolveFilePath(templatePath);
+      // 2. Normalize MinIO folder
+      const templatePrefix = this.normalizeObjectName(templatePath);
 
-      // 3. Lấy danh sách file trong folder
-      const entries = await readdir(templateDir, {
-        withFileTypes: true,
+      const outputName = this.normalizeObjectName(outputPath);
+
+      if (outputName.includes('/')) {
+        throw new BadRequestException('Output folder chỉ được chứa một cấp');
+      }
+
+      const parentFolder = posix.dirname(templatePrefix);
+
+      const outputPrefix =
+        parentFolder === '.' ? outputName : `${parentFolder}/${outputName}`;
+
+      // 3. Get template files from MinIO
+      const objects = await this.minioService.listFiles(templatePrefix);
+
+      const templateFiles = objects.filter((objectName) => {
+        const fileName = posix.basename(objectName);
+
+        // Chỉ lấy file trực tiếp trong folder templates
+        const isDirectChild = posix.dirname(objectName) === templatePrefix;
+
+        return (
+          isDirectChild &&
+          !fileName.startsWith('~$') &&
+          extname(fileName).toLowerCase() === '.docx'
+        );
       });
-
-      const templateFiles = entries.filter(
-        (entry) =>
-          entry.isFile() &&
-          !entry.name.startsWith('~$') &&
-          extname(entry.name).toLowerCase() === '.docx',
-      );
 
       if (templateFiles.length === 0) {
-        throw new NotFoundException(`No .docx files found in: ${templatePath}`);
+        throw new NotFoundException(
+          `No .docx files found in: ${templatePrefix}`,
+        );
       }
 
-      // 4. Tạo output folder cùng cấp với folder templates
-      const outputDir = resolve(dirname(templateDir), outputPath);
+      // 4. Remove previous generated files
+      const oldFiles = await this.minioService.listFiles(outputPrefix);
 
-      // Kiểm tra outputDir nằm trong thư mục cha của templates
-      const parentDir = dirname(templateDir);
-
-      if (!outputDir.startsWith(`${parentDir}${sep}`)) {
-        throw new BadRequestException('Invalid output path');
+      if (oldFiles.length > 0) {
+        await Promise.all(
+          oldFiles.map((file) => this.minioService.deleteFile(file)),
+        );
       }
 
-      // Xóa kết quả cũ nếu đã tồn tại
-      await rm(outputDir, {
-        recursive: true,
-        force: true,
-      });
-
-      await mkdir(outputDir, {
-        recursive: true,
-      });
-
-      // 5. Render từng file Word
+      // 5. Render each template
       const renderedFiles: string[] = [];
 
-      for (const file of templateFiles) {
-        const sourcePath = resolve(templateDir, file.name);
+      for (const templateObject of templateFiles) {
+        // Read Word template from MinIO
+        const templateBuffer = await this.minioService.getFile(templateObject);
 
-        // Đọc template
-        const templateBuffer = await readFile(sourcePath);
-
-        // Khởi tạo PizZip
+        // Initialize PizZip
         const zip = new PizZip(templateBuffer);
 
-        // Khởi tạo Docxtemplater
+        // Initialize Docxtemplater
         const doc = new Docxtemplater(zip, {
           paragraphLoop: true,
           linebreaks: true,
           parser: angularParser,
         });
 
-        // Render dữ liệu
+        // Render
         doc.render(data);
 
-        // Xuất Buffer
+        // Generate Buffer
         const buffer = doc.getZip().generate({
           type: 'nodebuffer',
           compression: 'DEFLATE',
@@ -413,32 +410,29 @@ export class DocxtemplaterService {
           },
         });
 
-        // Ghi file vào output folder
-        const outputFilePath = resolve(outputDir, file.name);
+        // Generate output object name
+        const fileName = posix.basename(templateObject);
 
-        await writeFile(outputFilePath, buffer);
+        const outputObjectName = `${outputPrefix}/${fileName}`;
 
-        // Lưu đường dẫn tương đối theo uploadFolder
-        const relativeFilePath = `/${relative(
-          resolve(process.cwd(), uploadConfig.uploadFolder),
-          outputFilePath,
-        )
-          .split(sep)
-          .join('/')}`;
+        // Detect MIME type
+        const contentType =
+          lookup(fileName) ||
+          'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
 
-        renderedFiles.push(relativeFilePath);
+        // Upload rendered Word to MinIO
+        await this.minioService.uploadBuffer(
+          buffer,
+          outputObjectName,
+          contentType,
+        );
+
+        renderedFiles.push(`/${outputObjectName}`);
       }
 
-      // 6. Trả kết quả
-      const relativeFolderPath = `/${relative(
-        resolve(process.cwd(), uploadConfig.uploadFolder),
-        outputDir,
-      )
-        .split(sep)
-        .join('/')}`;
-
+      // 6. Return result
       return {
-        folderPath: relativeFolderPath,
+        folderPath: `/${outputPrefix}`,
         files: renderedFiles,
       };
     } catch (error) {
@@ -447,12 +441,6 @@ export class DocxtemplaterService {
         error instanceof NotFoundException
       ) {
         throw error;
-      }
-
-      if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
-        throw new NotFoundException(
-          `Template folder not found: ${templatePath}`,
-        );
       }
 
       throw new InternalServerErrorException({
