@@ -7,7 +7,6 @@ import { ContextInterceptor } from '@/core/interceptors/context.interceptor';
 import { LoggerInterceptor } from '@/core/interceptors/logger.interceptor';
 import { DrizzleClientModule } from '@/libs/drizzle-client/drizzle-client.module';
 import { minioConfig } from './configs/minio.config';
-import { uploadConfig } from './configs/upload.config';
 import { DocxtemplaterModule } from './libs/docxtemplater/docxtemplater.module';
 import { MinioModule } from './libs/minio/minio.module';
 import { RecordDataModule } from './modules/record-data/record-data.module';
